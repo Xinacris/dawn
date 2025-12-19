@@ -7,8 +7,9 @@ class FacetFiltersForm extends HTMLElement {
       this.onSubmitHandler(event);
     }, 800);
 
-    const facetForm = this.querySelector('form');
-    if (facetForm) facetForm.addEventListener('input', this.debouncedOnSubmit.bind(this));
+    // Removed automatic form submission on input - filters now require Apply button
+    // const facetForm = this.querySelector('form');
+    // if (facetForm) facetForm.addEventListener('input', this.debouncedOnSubmit.bind(this));
 
     const facetWrapper = this.querySelector('#FacetsWrapperDesktop');
     if (facetWrapper) facetWrapper.addEventListener('keyup', onKeyUpEscape);
@@ -365,24 +366,25 @@ class FacetFiltersForm extends HTMLElement {
   onSubmitHandler(event) {
     event.preventDefault();
     const sortFilterForms = document.querySelectorAll('facet-filters-form form');
-    if (event.srcElement.className == 'mobile-facets__checkbox') {
-      const searchParams = this.createSearchParams(event.target.closest('form'));
-      this.onSubmitForm(searchParams, event);
-    } else {
-      const forms = [];
-      const isMobile = event.target.closest('form').id === 'FacetFiltersFormMobile';
+    // Removed automatic submission for mobile checkboxes - now requires Apply button
+    // if (event.srcElement.className == 'mobile-facets__checkbox') {
+    //   const searchParams = this.createSearchParams(event.target.closest('form'));
+    //   this.onSubmitForm(searchParams, event);
+    // } else {
+    const forms = [];
+    const isMobile = event.target.closest('form')?.id === 'FacetFiltersFormMobile';
 
-      sortFilterForms.forEach((form) => {
-        if (!isMobile) {
-          if (form.id === 'FacetSortForm' || form.id === 'FacetFiltersForm' || form.id === 'FacetSortDrawerForm') {
-            forms.push(this.createSearchParams(form));
-          }
-        } else if (form.id === 'FacetFiltersFormMobile') {
+    sortFilterForms.forEach((form) => {
+      if (!isMobile) {
+        if (form.id === 'FacetSortForm' || form.id === 'FacetFiltersForm' || form.id === 'FacetSortDrawerForm') {
           forms.push(this.createSearchParams(form));
         }
-      });
-      this.onSubmitForm(forms.join('&'), event);
-    }
+      } else if (form.id === 'FacetFiltersFormMobile') {
+        forms.push(this.createSearchParams(form));
+      }
+    });
+    this.onSubmitForm(forms.join('&'), event);
+    // }
   }
 
   onActiveFilterClick(event) {
@@ -454,18 +456,74 @@ class PriceRange extends HTMLElement {
       const minPercentage = range > 0 ? ((minVal - minLimit) / range) * 100 : 0;
       const maxPercentage = range > 0 ? ((maxVal - minLimit) / range) * 100 : 100;
 
-      if (minValueDisplay) {
+      if (minValueDisplay && valuesContainer) {
         const currentText = minValueDisplay.textContent || '';
         const currencySymbol = currentText.replace(/[\d,.\s]/g, '').trim() || '$';
         minValueDisplay.textContent = currencySymbol + minVal;
         minValueDisplay.style.left = `${minPercentage}%`;
+
+        const isMobile = window.innerWidth <= 768;
+
+        if (isMobile) {
+          const containerRect = valuesContainer.getBoundingClientRect();
+          const elementRect = minValueDisplay.getBoundingClientRect();
+          const elementWidth = elementRect.width;
+          const leftPosition = (minPercentage / 100) * containerRect.width;
+
+          const currentTransform = minValueDisplay.style.transform || 'translateX(-50%)';
+          const isCurrentlyLeftAligned = currentTransform.includes('translateX(0)');
+          const isCurrentlyRightAligned = currentTransform.includes('translateX(-100%)');
+
+          const leftThreshold = isCurrentlyLeftAligned ? elementWidth : elementWidth / 2;
+          const rightThreshold = isCurrentlyRightAligned
+            ? containerRect.width - elementWidth
+            : containerRect.width - elementWidth / 2;
+
+          if (leftPosition < leftThreshold) {
+            minValueDisplay.style.transform = 'translateX(0)';
+          } else if (leftPosition > rightThreshold) {
+            minValueDisplay.style.transform = 'translateX(-100%)';
+          } else {
+            minValueDisplay.style.transform = 'translateX(-50%)';
+          }
+        } else {
+          minValueDisplay.style.transform = 'translateX(-50%)';
+        }
       }
 
-      if (maxValueDisplay) {
+      if (maxValueDisplay && valuesContainer) {
         const currentText = maxValueDisplay.textContent || '';
         const currencySymbol = currentText.replace(/[\d,.\s]/g, '').trim() || '$';
         maxValueDisplay.textContent = currencySymbol + maxVal;
         maxValueDisplay.style.left = `${maxPercentage}%`;
+
+        const isMobile = window.innerWidth <= 768;
+
+        if (isMobile) {
+          const containerRect = valuesContainer.getBoundingClientRect();
+          const elementRect = maxValueDisplay.getBoundingClientRect();
+          const elementWidth = elementRect.width;
+          const leftPosition = (maxPercentage / 100) * containerRect.width;
+
+          const currentTransform = maxValueDisplay.style.transform || 'translateX(-50%)';
+          const isCurrentlyLeftAligned = currentTransform.includes('translateX(0)');
+          const isCurrentlyRightAligned = currentTransform.includes('translateX(-100%)');
+
+          const leftThreshold = isCurrentlyLeftAligned ? elementWidth : elementWidth / 2;
+          const rightThreshold = isCurrentlyRightAligned
+            ? containerRect.width - elementWidth
+            : containerRect.width - elementWidth / 2;
+
+          if (leftPosition > rightThreshold) {
+            maxValueDisplay.style.transform = 'translateX(-100%)';
+          } else if (leftPosition < leftThreshold) {
+            maxValueDisplay.style.transform = 'translateX(0)';
+          } else {
+            maxValueDisplay.style.transform = 'translateX(-50%)';
+          }
+        } else {
+          maxValueDisplay.style.transform = 'translateX(-50%)';
+        }
       }
     };
 
@@ -473,8 +531,20 @@ class PriceRange extends HTMLElement {
     minSlider.addEventListener('input', updateRange);
     maxSlider.addEventListener('input', updateRange);
 
-    // Initialize display values
-    updateRange();
+    // Update on window resize to handle mobile orientation changes
+    let resizeTimeout;
+    const handleResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        updateRange();
+      }, 100);
+    };
+    window.addEventListener('resize', handleResize);
+
+    // Initialize display values with a slight delay to ensure layout is complete
+    setTimeout(() => {
+      updateRange();
+    }, 0);
   }
 
   onRangeChange(event) {
