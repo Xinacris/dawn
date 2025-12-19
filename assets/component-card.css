@@ -305,6 +305,17 @@
   margin-bottom: 0;
 }
 
+.card-product-link {
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+@media screen and (max-width: 749px) {
+  .card-product-link {
+    font-size: 1.6rem !important;
+  }
+}
+
 .card__heading:last-child {
   margin-bottom: 0;
 }
@@ -461,9 +472,6 @@
   overflow: hidden;
 }
 
-.card-information > * + * {
-  margin-top: 0.5rem;
-}
 
 .card-information {
   width: 100%;
@@ -492,10 +500,6 @@
   + quantity-popover:not(.rating):not(.card__information-volume-pricing-note),
 .card-information .card__information-volume-pricing-note.card__information-volume-pricing-note--button {
   margin-top: 0;
-}
-
-.card-information > *:not(.visually-hidden:first-child) + *:not(.rating):not(.card__information-volume-pricing-note) {
-  margin-top: 0.7rem;
 }
 
 .card-information .caption {

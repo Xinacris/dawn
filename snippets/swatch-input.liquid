@@ -25,6 +25,16 @@
     %}
 {% endcomment %}
 
+{%- liquid
+  assign is_white_swatch = false
+  assign rgb_values = swatch.color.rgb | split: ' '
+  assign r = rgb_values[0] | plus: 0
+  assign g = rgb_values[1] | plus: 0
+  assign b = rgb_values[2] | plus: 0
+  if r >= 240 and g >= 240 and b >= 240
+    assign is_white_swatch = true
+  endif
+-%}
 <input
   type="{{ type | default: 'radio' }}"
   id="{{ id }}"
@@ -45,8 +55,11 @@
 <label
   for="{{ id }}"
   title="{{ value }}"
-  class="swatch-input__label{% if shape == 'square' %} swatch-input__label--square{% endif %}"
+  class="swatch-input__label{% if is_white_swatch %} swatch-input__label--white {% endif %}"
 >
   {% render 'swatch', swatch: swatch, shape: shape %}
+  <span class="swatch-input__checkmark">
+    {{ 'icon-checkmark.svg' | inline_asset_content }}
+  </span>
   {{ help_text }}
 </label>
