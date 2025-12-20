@@ -7,11 +7,111 @@ class FacetFiltersForm extends HTMLElement {
       this.onSubmitHandler(event);
     }, 800);
 
-    const facetForm = this.querySelector('form');
-    facetForm.addEventListener('input', this.debouncedOnSubmit.bind(this));
+    // Removed automatic form submission on input - filters now require Apply button
+    // const facetForm = this.querySelector('form');
+    // if (facetForm) facetForm.addEventListener('input', this.debouncedOnSubmit.bind(this));
 
     const facetWrapper = this.querySelector('#FacetsWrapperDesktop');
     if (facetWrapper) facetWrapper.addEventListener('keyup', onKeyUpEscape);
+
+    const toggleButton = document.querySelector('[data-facets-toggle]');
+    if (toggleButton) {
+      toggleButton.addEventListener('click', this.toggleAllFilters.bind(this));
+
+      const facetWrapper = document.querySelector('#FacetsWrapperDesktop');
+      if (facetWrapper) {
+        const allDetails = facetWrapper.querySelectorAll('details.js-filter');
+        const hasOpenDetails = Array.from(allDetails).some((detail) => detail.hasAttribute('open'));
+        toggleButton.setAttribute('aria-expanded', hasOpenDetails ? 'true' : 'false');
+      }
+    }
+  }
+
+  toggleAllFilters(event) {
+    event.preventDefault();
+    const facetWrapper = document.querySelector('#FacetsWrapperDesktop');
+    if (!facetWrapper) return;
+
+    const allDetails = facetWrapper.querySelectorAll('details.js-filter');
+    const isExpanded = event.currentTarget.getAttribute('aria-expanded') === 'true';
+
+    allDetails.forEach((detail) => {
+      if (isExpanded) {
+        detail.removeAttribute('open');
+      } else {
+        detail.setAttribute('open', '');
+      }
+    });
+
+    event.currentTarget.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
+
+    const svg = event.currentTarget.querySelector('svg');
+    if (svg) {
+      svg.style.transform = isExpanded ? 'rotate(0deg)' : 'rotate(180deg)';
+      svg.style.transition = 'transform 0.3s ease';
+    }
+  }
+
+  static handleApplyFilterClick(event) {
+    const desktopButton = event.target.closest('.facets__apply-filter');
+    if (desktopButton) {
+      event.preventDefault();
+      const facetForm = desktopButton.closest('facet-filters-form');
+      if (facetForm) {
+        const form = facetForm.querySelector('form');
+        if (form) {
+          const searchParams = facetForm.createSearchParams(form);
+          facetForm.onSubmitForm(searchParams, event);
+        }
+      }
+      return;
+    }
+
+    const mobileButton = event.target.closest('[data-apply-filter]');
+    if (mobileButton) {
+      event.preventDefault();
+      const facetForm = mobileButton.closest('facet-filters-form');
+      if (facetForm) {
+        const form = facetForm.querySelector('form');
+        if (form) {
+          const searchParams = facetForm.createSearchParams(form);
+          facetForm.onSubmitForm(searchParams, event);
+          const drawer = mobileButton.closest('.mobile-facets__wrapper');
+          if (drawer) {
+            const summary = drawer.querySelector('summary');
+            if (summary) summary.click();
+          }
+        }
+      }
+      return;
+    }
+  }
+
+  static updateFilterVisualState(event) {
+    if (event.target.type !== 'checkbox') return;
+
+    const facetForm = event.target.closest('facet-filters-form');
+    if (!facetForm) return;
+
+    const input = event.target;
+    const isChecked = input.checked;
+
+    if (input.closest('.swatch-input-wrapper')) {
+      if (isChecked) {
+        input.setAttribute('checked', 'checked');
+      } else {
+        input.removeAttribute('checked');
+      }
+    }
+
+    const label = input.closest('.facets__label, .mobile-facets__label');
+    if (label) {
+      if (isChecked) {
+        label.classList.add('active');
+      } else {
+        label.classList.remove('active');
+      }
+    }
   }
 
   static setListeners() {
@@ -21,6 +121,10 @@ class FacetFiltersForm extends HTMLElement {
       FacetFiltersForm.renderPage(searchParams, null, false);
     };
     window.addEventListener('popstate', onHistoryChange);
+
+    document.addEventListener('click', FacetFiltersForm.handleApplyFilterClick);
+
+    document.addEventListener('change', FacetFiltersForm.updateFilterVisualState);
   }
 
   static toggleActiveFacets(disable = true) {
@@ -252,6 +356,44 @@ class FacetFiltersForm extends HTMLElement {
 
   createSearchParams(form) {
     const formData = new FormData(form);
+
+    const priceRangeContainers = form.querySelectorAll('price-range');
+
+    priceRangeContainers.forEach((container) => {
+      let minInput = container.querySelector('.price-range-slider__input--min');
+      let maxInput = container.querySelector('.price-range-slider__input--max');
+
+      if (!minInput || !maxInput) {
+        const textInputs = container.querySelectorAll('input[type="text"]');
+        if (textInputs.length >= 2) {
+          minInput = textInputs[0];
+          maxInput = textInputs[1];
+        }
+      }
+
+      if (!minInput || !maxInput || !minInput.name || !maxInput.name) return;
+
+      const minValue = parseFloat(minInput.value) || 0;
+      const maxValue = parseFloat(maxInput.value) || 0;
+
+      const minLimit =
+        parseFloat(minInput.getAttribute('min') || minInput.min || minInput.getAttribute('data-min') || 0) || 0;
+      const maxLimit =
+        parseFloat(
+          maxInput.getAttribute('max') ||
+            maxInput.max ||
+            maxInput.getAttribute('data-max') ||
+            minInput.getAttribute('max') ||
+            minInput.max ||
+            0
+        ) || 0;
+
+      if (minValue === minLimit && maxValue === maxLimit) {
+        formData.delete(minInput.name);
+        formData.delete(maxInput.name);
+      }
+    });
+
     return new URLSearchParams(formData).toString();
   }
 
@@ -262,24 +404,25 @@ class FacetFiltersForm extends HTMLElement {
   onSubmitHandler(event) {
     event.preventDefault();
     const sortFilterForms = document.querySelectorAll('facet-filters-form form');
-    if (event.srcElement.className == 'mobile-facets__checkbox') {
-      const searchParams = this.createSearchParams(event.target.closest('form'));
-      this.onSubmitForm(searchParams, event);
-    } else {
-      const forms = [];
-      const isMobile = event.target.closest('form').id === 'FacetFiltersFormMobile';
+    // Removed automatic submission for mobile checkboxes - now requires Apply button
+    // if (event.srcElement.className == 'mobile-facets__checkbox') {
+    //   const searchParams = this.createSearchParams(event.target.closest('form'));
+    //   this.onSubmitForm(searchParams, event);
+    // } else {
+    const forms = [];
+    const isMobile = event.target.closest('form')?.id === 'FacetFiltersFormMobile';
 
-      sortFilterForms.forEach((form) => {
-        if (!isMobile) {
-          if (form.id === 'FacetSortForm' || form.id === 'FacetFiltersForm' || form.id === 'FacetSortDrawerForm') {
-            forms.push(this.createSearchParams(form));
-          }
-        } else if (form.id === 'FacetFiltersFormMobile') {
+    sortFilterForms.forEach((form) => {
+      if (!isMobile) {
+        if (form.id === 'FacetSortForm' || form.id === 'FacetFiltersForm' || form.id === 'FacetSortDrawerForm') {
           forms.push(this.createSearchParams(form));
         }
-      });
-      this.onSubmitForm(forms.join('&'), event);
-    }
+      } else if (form.id === 'FacetFiltersFormMobile') {
+        forms.push(this.createSearchParams(form));
+      }
+    });
+    this.onSubmitForm(forms.join('&'), event);
+    // }
   }
 
   onActiveFilterClick(event) {
@@ -302,11 +445,129 @@ FacetFiltersForm.setListeners();
 class PriceRange extends HTMLElement {
   constructor() {
     super();
-    this.querySelectorAll('input').forEach((element) => {
-      element.addEventListener('change', this.onRangeChange.bind(this));
-      element.addEventListener('keydown', this.onKeyDown.bind(this));
-    });
-    this.setMinAndMaxValues();
+    const sliderInputs = this.querySelectorAll('input[type="range"]');
+    const textInputs = this.querySelectorAll('input[type="text"]');
+
+    if (sliderInputs.length > 0) {
+      this.initSlider();
+    } else {
+      textInputs.forEach((element) => {
+        element.addEventListener('change', this.onRangeChange.bind(this));
+        element.addEventListener('keydown', this.onKeyDown.bind(this));
+      });
+      this.setMinAndMaxValues();
+    }
+  }
+
+  initSlider() {
+    const minSlider = this.querySelector('.price-range-slider__input--min');
+    const maxSlider = this.querySelector('.price-range-slider__input--max');
+    const minValueDisplay = this.querySelector('.price-range-slider__value--min');
+    const maxValueDisplay = this.querySelector('.price-range-slider__value--max');
+    const rangeElement = this.querySelector('.price-range-slider');
+    const valuesContainer = this.querySelector('.price-range-slider__values');
+    const isMobile = window.innerWidth <= 768;
+
+    if (!minSlider || !maxSlider || !rangeElement) return;
+
+    const minLimit = parseFloat(minSlider.min) || 0;
+    const maxLimit = parseFloat(minSlider.max) || 100;
+    const range = maxLimit - minLimit;
+
+    if (isMobile) {
+      minValueDisplay.style.transform = 'translateX(0)';
+      maxValueDisplay.style.transform = 'translateX(-100%)';
+    } else {
+      minValueDisplay.style.transform = 'translateX(-50%)';
+      maxValueDisplay.style.transform = 'translateX(-50%)';
+    }
+
+    const updateRange = (e) => {
+      let minVal = parseFloat(minSlider.value);
+      let maxVal = parseFloat(maxSlider.value);
+
+      if (e && e.target.classList.contains('price-range-slider__input--min') && minVal > maxVal) {
+        maxSlider.value = minVal;
+        maxVal = minVal;
+      }
+
+      if (e && e.target.classList.contains('price-range-slider__input--max') && maxVal < minVal) {
+        minSlider.value = maxVal;
+        minVal = maxVal;
+      }
+
+      rangeElement.style.setProperty('--minVal', minVal);
+      rangeElement.style.setProperty('--maxVal', maxVal);
+
+      const minPercentage = range > 0 ? ((minVal - minLimit) / range) * 100 : 0;
+      const maxPercentage = range > 0 ? ((maxVal - minLimit) / range) * 100 : 100;
+
+      const updateValueDisplay = (valueDisplay, value, percentage, isMin) => {
+        if (!valueDisplay || !valuesContainer) return;
+
+        const currentText = valueDisplay.textContent || '';
+        const currencySymbol = currentText.replace(/[\d,.\s]/g, '').trim() || '$';
+        valueDisplay.textContent = currencySymbol + value;
+        valueDisplay.style.left = `${percentage}%`;
+
+        if (isMobile) {
+          if (e) {
+            const containerRect = valuesContainer.getBoundingClientRect();
+            const elementRect = valueDisplay.getBoundingClientRect();
+            const elementWidth = elementRect.width;
+            const leftPosition = (percentage / 100) * containerRect.width;
+
+            const currentTransform = valueDisplay.style.transform || 'translateX(-50%)';
+            const isCurrentlyLeftAligned = currentTransform.includes('translateX(0)');
+            const isCurrentlyRightAligned = currentTransform.includes('translateX(-100%)');
+
+            const leftThreshold = isCurrentlyLeftAligned ? elementWidth : elementWidth / 2;
+            const rightThreshold = isCurrentlyRightAligned
+              ? containerRect.width - elementWidth
+              : containerRect.width - elementWidth / 2;
+
+            if (isMin) {
+              if (leftPosition < leftThreshold) {
+                valueDisplay.style.transform = 'translateX(0)';
+              } else if (leftPosition > rightThreshold) {
+                valueDisplay.style.transform = 'translateX(-100%)';
+              } else {
+                valueDisplay.style.transform = 'translateX(-50%)';
+              }
+            } else {
+              if (leftPosition > rightThreshold) {
+                valueDisplay.style.transform = 'translateX(-100%)';
+              } else if (leftPosition < leftThreshold) {
+                valueDisplay.style.transform = 'translateX(0)';
+              } else {
+                valueDisplay.style.transform = 'translateX(-50%)';
+              }
+            }
+          }
+        } else {
+          valueDisplay.style.transform = 'translateX(-50%)';
+        }
+      };
+
+      updateValueDisplay(minValueDisplay, minVal, minPercentage, true);
+      updateValueDisplay(maxValueDisplay, maxVal, maxPercentage, false);
+    };
+
+    minSlider.addEventListener('input', updateRange);
+    maxSlider.addEventListener('input', updateRange);
+
+    let resizeTimeout;
+    const handleResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        updateRange();
+      }, 100);
+    };
+    window.addEventListener('resize', handleResize);
+
+    setTimeout(() => {
+      updateRange();
+    }, 0);
   }
 
   onRangeChange(event) {
@@ -322,7 +583,8 @@ class PriceRange extends HTMLElement {
   }
 
   setMinAndMaxValues() {
-    const inputs = this.querySelectorAll('input');
+    const inputs = this.querySelectorAll('input[type="text"]');
+    if (inputs.length < 2) return;
     const minInput = inputs[0];
     const maxInput = inputs[1];
     if (maxInput.value) minInput.setAttribute('data-max', maxInput.value);

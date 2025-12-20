@@ -275,6 +275,8 @@ a.product__text {
 }
 
 .product .price__container {
+  display: flex !important;
+  gap: 1rem !important;
   margin-bottom: 0.5rem;
 }
 

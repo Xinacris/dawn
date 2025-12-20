@@ -1,0 +1,43 @@
+{%- liquid
+  assign min_value = filter.min_value.value | default: 0 | money_without_currency | plus: 0
+  assign max_value = filter.max_value.value | default: filter.range_max | money_without_currency | plus: 0
+  assign range_max = filter.range_max | money_without_currency | plus: 0
+-%}
+
+<div class="price-range-slider-wrapper">
+  <div
+    class="price-range-slider"
+    style="--minVal: {{ min_value }}; --maxVal: {{ max_value }}; --minLimit: 0; --maxLimit: {{ range_max }};"
+  >
+    <input
+      type="range"
+      class="price-range-slider__input price-range-slider__input--min"
+      name="{{ filter.min_value.param_name }}"
+      id="{{ id_prefix }}{{ filter.label | escape }}-GTE"
+      min="0"
+      max="{{ range_max }}"
+      value="{{ min_value }}"
+      step="1"
+    >
+    <input
+      type="range"
+      class="price-range-slider__input price-range-slider__input--max"
+      name="{{ filter.max_value.param_name }}"
+      id="{{ id_prefix }}{{ filter.label | escape }}-LTE"
+      min="0"
+      max="{{ range_max }}"
+      value="{{ max_value }}"
+      step="1"
+    >
+  </div>
+  <div class="price-range-slider__values">
+    <span class="price-range-slider__value price-range-slider__value--min">
+      {{ cart.currency.symbol -}}
+      {{- min_value }}
+    </span>
+    <span class="price-range-slider__value price-range-slider__value--max">
+      {{ cart.currency.symbol -}}
+      {{- max_value }}
+    </span>
+  </div>
+</div>

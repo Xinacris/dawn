@@ -2,6 +2,7 @@ slideshow-component {
   position: relative;
   display: flex;
   flex-direction: column;
+  width: 100%;
 }
 
 slideshow-component .slideshow.banner {
@@ -10,6 +11,17 @@ slideshow-component .slideshow.banner {
   margin: 0;
   gap: 0;
   overflow-y: hidden;
+  width: 100%;
+}
+
+@media screen and (max-width: 749px) {
+  slideshow-component {
+    min-height: 0;
+  }
+  
+  slideshow-component .slideshow.banner {
+    min-width: 100%;
+  }
 }
 
 .slideshow__slide {
